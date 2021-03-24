@@ -1,14 +1,14 @@
 <?php
 
+declare(strict_types=1);
+
 namespace omnilight\scheduling;
+
 use Yii;
 use yii\base\Application;
 use yii\base\InvalidParamException;
 use yii\mutex\Mutex;
 
-/**
- * Class CallbackEvent
- */
 class CallbackEvent extends Event
 {
     /**
@@ -27,10 +27,11 @@ class CallbackEvent extends Event
     /**
      * Create a new event instance.
      *
-     * @param Mutex $mutex
+     * @param Mutex  $mutex
      * @param string $callback
-     * @param array $parameters
-     * @param array $config
+     * @param array  $parameters
+     * @param array  $config
+     *
      * @throws InvalidParamException
      */
     public function __construct(Mutex $mutex, $callback, array $parameters = [], $config = [])
@@ -43,10 +44,9 @@ class CallbackEvent extends Event
             Yii::configure($this, $config);
         }
 
-        if ( ! is_string($this->callback) && ! is_callable($this->callback))
-        {
+        if (!\is_string($this->callback) && !\is_callable($this->callback)) {
             throw new InvalidParamException(
-                "Invalid scheduled callback event. Must be string or callable."
+                'Invalid scheduled callback event. Must be string or callable.'
             );
         }
     }
@@ -55,22 +55,25 @@ class CallbackEvent extends Event
      * Run the given event.
      *
      * @param Application $app
+     *
      * @return mixed
      */
     public function run(Application $app)
     {
         $this->trigger(self::EVENT_BEFORE_RUN);
-        $response = call_user_func_array($this->callback, array_merge($this->parameters, [$app]));
+        $response = \call_user_func_array($this->callback, array_merge($this->parameters, [$app]));
         parent::callAfterCallbacks($app);
         $this->trigger(self::EVENT_AFTER_RUN);
+
         return $response;
     }
 
     /**
      * Do not allow the event to overlap each other.
      *
-     * @return $this
      * @throws InvalidParamException
+     *
+     * @return $this
      */
     public function withoutOverlapping()
     {
@@ -84,24 +87,26 @@ class CallbackEvent extends Event
     }
 
     /**
-     * Get the mutex name for the scheduled command.
-     *
-     * @return string
-     */
-    protected function mutexName()
-    {
-        return 'framework/schedule-' . sha1($this->_description);
-    }
-
-    /**
      * Get the summary of the event for display.
      *
      * @return string
      */
     public function getSummaryForDisplay()
     {
-        if (is_string($this->_description)) return $this->_description;
-        return is_string($this->callback) ? $this->callback : 'Closure';
+        if (\is_string($this->_description)) {
+            return $this->_description;
+        }
+
+        return \is_string($this->callback) ? $this->callback : 'Closure';
     }
 
+    /**
+     * Get the mutex name for the scheduled command.
+     *
+     * @return string
+     */
+    protected function mutexName()
+    {
+        return 'framework/schedule-'.sha1($this->_description);
+    }
 }

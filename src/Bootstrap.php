@@ -1,19 +1,17 @@
 <?php
 
+declare(strict_types=1);
+
 namespace omnilight\scheduling;
-use yii\base\BootstrapInterface;
+
 use yii\base\Application;
-use yii\di\Instance;
+use yii\base\BootstrapInterface;
 
-
-/**
- * Class Bootstrap
- */
 class Bootstrap implements BootstrapInterface
 {
-
     /**
      * Bootstrap method to be called during application bootstrap stage.
+     *
      * @param Application $app the application currently running
      */
     public function bootstrap($app)

@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace omnilight\scheduling\Tests;
 
 use omnilight\scheduling\Event;
@@ -20,7 +22,8 @@ class EventTest extends TestCase
 
     /**
      * @dataProvider buildCommandData
-     * @param bool $omitErrors
+     *
+     * @param bool   $omitErrors
      * @param string $command
      * @param string $outputTo
      * @param string $result
