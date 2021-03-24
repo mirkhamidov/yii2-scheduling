@@ -27,7 +27,7 @@ class Event extends Component
      * Command string
      * @var string
      */
-    public string $command;
+    public string $command = '';
 
     /**
      * The cron expression representing the event's frequency.
@@ -39,9 +39,9 @@ class Event extends Component
     /**
      * The timezone the date should be evaluated on.
      *
-     * @var DateTimeZone|string
+     * @var DateTimeZone|string|null
      */
-    protected DateTimeZone|string $_timezone;
+    protected DateTimeZone|string|null $_timezone = null;
 
     /**
      * The user the command should run as.
@@ -53,16 +53,16 @@ class Event extends Component
     /**
      * The filter callback.
      *
-     * @var Closure
+     * @var Closure|null
      */
-    protected Closure $_filter;
+    protected ?Closure $_filter = null;
 
     /**
      * The reject callback.
      *
-     * @var Closure
+     * @var Closure|null
      */
-    protected Closure $_reject;
+    protected ?Closure $_reject = null;
 
     /**
      * The location that output should be sent to.
@@ -90,7 +90,7 @@ class Event extends Component
      *
      * @var string
      */
-    protected string $_description;
+    protected string $_description = '';
 
     /**
      * The mutex implementation.
