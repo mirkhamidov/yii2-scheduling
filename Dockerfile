@@ -1,17 +1,14 @@
 FROM composer
 
-FROM php:5.4-cli
+FROM php:8.0-cli
 
 RUN apt-get update && \
     apt-get install -y \
         git \
+        libonig-dev \
         unzip
 
-RUN docker-php-ext-install mbstring
-
 COPY --from=composer /usr/bin/composer /usr/bin/composer
-
-RUN composer global require hirak/prestissimo
 
 WORKDIR /app
 
