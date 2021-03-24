@@ -2,8 +2,12 @@
 
 namespace omnilight\scheduling;
 
+use Closure;
 use Cron\CronExpression;
+use DateTime;
+use DateTimeZone;
 use GuzzleHttp\Client as HttpClient;
+use LogicException;
 use Symfony\Component\Process\Process;
 use yii\base\Application;
 use yii\base\Component;
@@ -13,86 +17,94 @@ use yii\mail\MailerInterface;
 use yii\mutex\Mutex;
 use yii\mutex\FileMutex;
 
-/**
- * Class Event
- */
 class Event extends Component
 {
     const EVENT_BEFORE_RUN = 'beforeRun';
+
     const EVENT_AFTER_RUN = 'afterRun';
 
     /**
      * Command string
      * @var string
      */
-    public $command;
+    public string $command;
+
     /**
      * The cron expression representing the event's frequency.
      *
      * @var string
      */
-    protected $_expression = '* * * * * *';
+    protected string $_expression = '* * * * *';
+
     /**
      * The timezone the date should be evaluated on.
      *
-     * @var \DateTimeZone|string
+     * @var DateTimeZone|string
      */
-    protected $_timezone;
+    protected DateTimeZone|string $_timezone;
+
     /**
      * The user the command should run as.
      *
-     * @var string
+     * @var string|null
      */
-    protected $_user;
+    protected ?string $_user = null;
+
     /**
      * The filter callback.
      *
-     * @var \Closure
+     * @var Closure
      */
-    protected $_filter;
+    protected Closure $_filter;
+
     /**
      * The reject callback.
      *
-     * @var \Closure
+     * @var Closure
      */
-    protected $_reject;
+    protected Closure $_reject;
+
     /**
      * The location that output should be sent to.
      *
-     * @var string
+     * @var string|null
      */
-    protected $_output = null;
+    protected ?string $_output = null;
+
     /**
      * The string for redirection.
      *
-     * @var array
+     * @var array|string
      */
-    protected $_redirect = ' > ';
+    protected array|string $_redirect = ' > ';
+
     /**
      * The array of callbacks to be run after the event is finished.
      *
      * @var array
      */
-    protected $_afterCallbacks = [];
+    protected array $_afterCallbacks = [];
+
     /**
      * The human readable description of the event.
      *
      * @var string
      */
-    protected $_description;
+    protected string $_description;
+
     /**
      * The mutex implementation.
      *
-     * @var \yii\mutex\Mutex
+     * @var Mutex
      */
-    protected $_mutex;
+    protected Mutex $_mutex;
 
     /**
      * Decide if errors will be displayed.
      *
      * @var bool
      */
-    protected $_omitErrors = false;
+    protected bool $_omitErrors = false;
 
     /**
      * Create a new event instance.
@@ -101,7 +113,7 @@ class Event extends Component
      * @param string $command
      * @param array $config
      */
-    public function __construct(Mutex $mutex, $command, $config = [])
+    public function __construct(Mutex $mutex, string $command, array $config = [])
     {
         $this->command = $command;
         $this->_mutex = $mutex;
@@ -129,7 +141,7 @@ class Event extends Component
      *
      * @return string
      */
-    protected function mutexName()
+    protected function mutexName(): string
     {
         return 'framework/schedule-' . sha1($this->_expression . $this->command);
     }
@@ -138,6 +150,7 @@ class Event extends Component
      * Run the command in the foreground.
      *
      * @param Application $app
+     * @throws InvalidConfigException
      */
     protected function runCommandInForeground(Application $app)
     {
@@ -152,7 +165,7 @@ class Event extends Component
      *
      * @return string
      */
-    public function buildCommand()
+    public function buildCommand(): string
     {
         $command = $this->command . $this->_redirect . $this->_output . (($this->_omitErrors) ? ' 2>&1 &' : '');
         return $this->_user ? 'sudo -u ' . $this->_user . ' ' . $command : $command;
@@ -174,6 +187,7 @@ class Event extends Component
      * Run the command in the background using exec.
      *
      * @param Application $app
+     * @throws InvalidConfigException
      */
     protected function runCommandInBackground(Application $app)
     {
@@ -187,7 +201,7 @@ class Event extends Component
      * @param Application $app
      * @return bool
      */
-    public function isDue(Application $app)
+    public function isDue(Application $app): bool
     {
         return $this->expressionPasses() && $this->filtersPass($app);
     }
@@ -199,11 +213,11 @@ class Event extends Component
      */
     protected function expressionPasses()
     {
-        $date = new \DateTime('now');
+        $date = new DateTime('now');
         if ($this->_timezone) {
             $date->setTimezone($this->_timezone);
         }
-        return CronExpression::factory($this->_expression)->isDue($date);
+        return (new CronExpression($this->_expression))->isDue($date);
     }
 
     /**
@@ -212,7 +226,7 @@ class Event extends Component
      * @param Application $app
      * @return bool
      */
-    protected function filtersPass(Application $app)
+    protected function filtersPass(Application $app): bool
     {
         if ($this->_filter && !call_user_func($this->_filter, $app) ||
             $this->_reject && call_user_func($this->_reject, $app)
@@ -227,9 +241,9 @@ class Event extends Component
      *
      * @return $this
      */
-    public function hourly()
+    public function hourly(): self
     {
-        return $this->cron('0 * * * * *');
+        return $this->cron('0 * * * *');
     }
 
     /**
@@ -238,7 +252,7 @@ class Event extends Component
      * @param  string $expression
      * @return $this
      */
-    public function cron($expression)
+    public function cron(string $expression): self
     {
         $this->_expression = $expression;
         return $this;
@@ -249,9 +263,9 @@ class Event extends Component
      *
      * @return $this
      */
-    public function daily()
+    public function daily(): self
     {
-        return $this->cron('0 0 * * * *');
+        return $this->cron('0 0 * * *');
     }
 
     /**
@@ -260,7 +274,7 @@ class Event extends Component
      * @param  string $time
      * @return $this
      */
-    public function at($time)
+    public function at(string $time): self
     {
         return $this->dailyAt($time);
     }
@@ -271,7 +285,7 @@ class Event extends Component
      * @param  string $time
      * @return $this
      */
-    public function dailyAt($time)
+    public function dailyAt(string $time): self
     {
         $segments = explode(':', $time);
         return $this->spliceIntoPosition(2, (int)$segments[0])
@@ -285,7 +299,7 @@ class Event extends Component
      * @param  string $value
      * @return Event
      */
-    protected function spliceIntoPosition($position, $value)
+    protected function spliceIntoPosition(int $position, string $value): Event
     {
         $segments = explode(' ', $this->_expression);
         $segments[$position - 1] = $value;
@@ -297,9 +311,9 @@ class Event extends Component
      *
      * @return $this
      */
-    public function twiceDaily()
+    public function twiceDaily(): self
     {
-        return $this->cron('0 1,13 * * * *');
+        return $this->cron('0 1,13 * * *');
     }
 
     /**
@@ -307,7 +321,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function weekdays()
+    public function weekdays(): self
     {
         return $this->spliceIntoPosition(5, '1-5');
     }
@@ -317,7 +331,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function mondays()
+    public function mondays(): self
     {
         return $this->days(1);
     }
@@ -328,7 +342,7 @@ class Event extends Component
      * @param  array|int $days
      * @return $this
      */
-    public function days($days)
+    public function days(array|int $days): self
     {
         $days = is_array($days) ? $days : func_get_args();
         return $this->spliceIntoPosition(5, implode(',', $days));
@@ -339,7 +353,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function tuesdays()
+    public function tuesdays(): self
     {
         return $this->days(2);
     }
@@ -349,7 +363,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function wednesdays()
+    public function wednesdays(): self
     {
         return $this->days(3);
     }
@@ -359,7 +373,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function thursdays()
+    public function thursdays(): self
     {
         return $this->days(4);
     }
@@ -369,7 +383,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function fridays()
+    public function fridays(): self
     {
         return $this->days(5);
     }
@@ -379,7 +393,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function saturdays()
+    public function saturdays(): self
     {
         return $this->days(6);
     }
@@ -389,7 +403,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function sundays()
+    public function sundays(): self
     {
         return $this->days(0);
     }
@@ -399,9 +413,9 @@ class Event extends Component
      *
      * @return $this
      */
-    public function weekly()
+    public function weekly(): self
     {
-        return $this->cron('0 0 * * 0 *');
+        return $this->cron('0 0 * * 0');
     }
 
     /**
@@ -411,7 +425,7 @@ class Event extends Component
      * @param  string $time
      * @return $this
      */
-    public function weeklyOn($day, $time = '0:0')
+    public function weeklyOn(int $day, string $time = '0:0'): self
     {
         $this->dailyAt($time);
         return $this->spliceIntoPosition(5, $day);
@@ -422,9 +436,9 @@ class Event extends Component
      *
      * @return $this
      */
-    public function monthly()
+    public function monthly(): self
     {
-        return $this->cron('0 0 1 * * *');
+        return $this->cron('0 0 1 * *');
     }
 
     /**
@@ -432,9 +446,9 @@ class Event extends Component
      *
      * @return $this
      */
-    public function yearly()
+    public function yearly(): self
     {
-        return $this->cron('0 0 1 1 * *');
+        return $this->cron('0 0 1 1 *');
     }
 
     /**
@@ -442,9 +456,9 @@ class Event extends Component
      *
      * @return $this
      */
-    public function everyMinute()
+    public function everyMinute(): self
     {
-        return $this->cron('* * * * * *');
+        return $this->cron('* * * * *');
     }
 
     /**
@@ -453,9 +467,9 @@ class Event extends Component
      * @param int|string $minutes
      * @return $this
      */
-    public function everyNMinutes($minutes)
+    public function everyNMinutes(int|string $minutes): self
     {
-        return $this->cron('*/'.$minutes.' * * * * *');
+        return $this->cron('*/'.$minutes.' * * * *');
     }
 
     /**
@@ -463,7 +477,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function everyFiveMinutes()
+    public function everyFiveMinutes(): self
     {
         return $this->everyNMinutes(5);
     }
@@ -473,7 +487,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function everyTenMinutes()
+    public function everyTenMinutes(): self
     {
         return $this->everyNMinutes(10);
     }
@@ -483,18 +497,18 @@ class Event extends Component
      *
      * @return $this
      */
-    public function everyThirtyMinutes()
+    public function everyThirtyMinutes(): self
     {
-        return $this->cron('0,30 * * * * *');
+        return $this->cron('0,30 * * * *');
     }
 
     /**
      * Set the timezone the date should be evaluated on.
      *
-     * @param  \DateTimeZone|string $timezone
+     * @param  DateTimeZone|string $timezone
      * @return $this
      */
-    public function timezone($timezone)
+    public function timezone(DateTimeZone|string $timezone): self
     {
         $this->_timezone = $timezone;
         return $this;
@@ -506,7 +520,7 @@ class Event extends Component
      * @param  string $user
      * @return $this
      */
-    public function user($user)
+    public function user(string $user): self
     {
         $this->_user = $user;
         return $this;
@@ -518,7 +532,7 @@ class Event extends Component
      * @param  bool $omitErrors
      * @return $this
      */
-    public function omitErrors($omitErrors = false)
+    public function omitErrors(bool $omitErrors = false): self
     {
         $this->_omitErrors = $omitErrors;
         return $this;
@@ -529,7 +543,7 @@ class Event extends Component
      *
      * @return $this
      */
-    public function withoutOverlapping()
+    public function withoutOverlapping(): self
     {
         return $this->then(function() {
             $this->_mutex->release($this->mutexName());
@@ -542,8 +556,9 @@ class Event extends Component
      * Allow the event to only run on one server for each cron expression.
      *
      * @return $this
+     * @throws InvalidConfigException
      */
-    public function onOneServer()
+    public function onOneServer(): self
     {
         if ($this->_mutex instanceof FileMutex) {
             throw new InvalidConfigException('You must config mutex in the application component, except the FileMutex.');
@@ -555,10 +570,10 @@ class Event extends Component
     /**
      * Register a callback to further filter the schedule.
      *
-     * @param  \Closure $callback
+     * @param  Closure $callback
      * @return $this
      */
-    public function when(\Closure $callback)
+    public function when(Closure $callback): self
     {
         $this->_filter = $callback;
         return $this;
@@ -567,10 +582,10 @@ class Event extends Component
     /**
      * Register a callback to further filter the schedule.
      *
-     * @param  \Closure $callback
+     * @param  Closure $callback
      * @return $this
      */
-    public function skip(\Closure $callback)
+    public function skip(Closure $callback): self
     {
         $this->_reject = $callback;
         return $this;
@@ -582,7 +597,7 @@ class Event extends Component
      * @param  string $location
      * @return $this
      */
-    public function sendOutputTo($location)
+    public function sendOutputTo(string $location): self
     {
         $this->_redirect = ' > ';
         $this->_output = $location;
@@ -595,7 +610,7 @@ class Event extends Component
      * @param  string $location
      * @return $this
      */
-    public function appendOutputTo($location)
+    public function appendOutputTo(string $location): self
     {
         $this->_redirect = ' >> ';
         $this->_output = $location;
@@ -608,9 +623,9 @@ class Event extends Component
      * @param  array $addresses
      * @return $this
      *
-     * @throws \LogicException
+     * @throws LogicException
      */
-    public function emailOutputTo($addresses)
+    public function emailOutputTo(array $addresses): self
     {
         if (is_null($this->_output) || $this->_output == $this->getDefaultOutput()) {
             throw new InvalidCallException("Must direct output to a file in order to e-mail results.");
@@ -624,10 +639,10 @@ class Event extends Component
     /**
      * Register a callback to be called after the operation.
      *
-     * @param  \Closure $callback
+     * @param  Closure $callback
      * @return $this
      */
-    public function then(\Closure $callback)
+    public function then(Closure $callback): self
     {
         $this->_afterCallbacks[] = $callback;
         return $this;
@@ -637,9 +652,10 @@ class Event extends Component
      * E-mail the output of the event to the recipients.
      *
      * @param MailerInterface $mailer
-     * @param  array $addresses
+     * @param array $addresses
+     * @return Event
      */
-    protected function emailOutput(MailerInterface $mailer, $addresses)
+    protected function emailOutput(MailerInterface $mailer, array $addresses): self
     {
         $textBody = file_get_contents($this->_output);
 
@@ -657,7 +673,7 @@ class Event extends Component
      *
      * @return string
      */
-    protected function getEmailSubject()
+    protected function getEmailSubject(): string
     {
         if ($this->_description) {
             return 'Scheduled Job Output (' . $this->_description . ')';
@@ -671,7 +687,7 @@ class Event extends Component
      * @param  string $url
      * @return $this
      */
-    public function thenPing($url)
+    public function thenPing(string $url): self
     {
         return $this->then(function () use ($url) {
             (new HttpClient)->get($url);
@@ -684,7 +700,7 @@ class Event extends Component
      * @param  string $description
      * @return $this
      */
-    public function description($description)
+    public function description(string $description): self
     {
         $this->_description = $description;
         return $this;
@@ -695,7 +711,7 @@ class Event extends Component
      *
      * @return string
      */
-    public function getSummaryForDisplay()
+    public function getSummaryForDisplay(): string
     {
         if (is_string($this->_description)) return $this->_description;
         return $this->buildCommand();
@@ -706,12 +722,12 @@ class Event extends Component
      *
      * @return string
      */
-    public function getExpression()
+    public function getExpression(): string
     {
         return $this->_expression;
     }
 
-    public function getDefaultOutput()
+    public function getDefaultOutput(): string
     {
         if (strtoupper(substr(PHP_OS, 0, 3)) === 'WIN') {
             return 'NUL';
